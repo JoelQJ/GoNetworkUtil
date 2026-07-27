@@ -38,7 +38,7 @@ func Wrap(data []byte, order binary.ByteOrder) *ByteBuf{
 func Write[T any](self *ByteBuf, codec Codec[T], value T){
 	codec.Encode(self, value)
 }
-func Read[T any](self *ByteBuf, decodec Codec[T]) T{
+func Read[T any](self *ByteBuf, decodec Decodec[T]) T{
 	return decodec.Decode(self)
 }
 
@@ -59,8 +59,7 @@ func (self *ByteBuf) writeReaming() int{
 
 func (self *ByteBuf) ToBytesSlice() []byte{
 	var maxPosition int = self.writeIndex;
-	var snapshotSlice []byte = make([]byte, maxPosition)
-	copy(snapshotSlice, self.buf)
-	return snapshotSlice
+	//Generamos un nuevo descriptor del slice pero apunta al mismo no se copia
+	return self.buf[: maxPosition : maxPosition]
 }
 

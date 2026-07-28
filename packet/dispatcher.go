@@ -1,8 +1,9 @@
 package packet
 
 import (
-	"GoNetworkUtils/codec"
 	"fmt"
+
+	"github.com/JoelQJ/GoNetworkUtil/codec"
 )
 
 type Dispatcher struct {

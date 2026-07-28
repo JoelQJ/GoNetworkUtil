@@ -1,6 +1,6 @@
 package packet
 
-import "GoNetworkUtils/codec"
+import "github.com/JoelQJ/GoNetworkUtil/codec"
 
 type Packet interface {
 	Id() uint16

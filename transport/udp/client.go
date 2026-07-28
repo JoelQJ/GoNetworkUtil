@@ -1,32 +1,28 @@
 package udp
 
 import (
-	"GoNetworkUtils/codec"
-	"GoNetworkUtils/packet"
+	"github.com/JoelQJ/GoNetworkUtil/codec"
 	"encoding/binary"
-	"log"
 	"net"
 )
 
 type Client[T any] struct {
-	Data       *T
-	conn       *net.UDPConn
-	addr       *net.UDPAddr
-	dispatcher *packet.Dispatcher
-	byteOrder  binary.ByteOrder
+	Data      *T
+	conn      *net.UDPConn
+	addr      *net.UDPAddr
+	byteOrder binary.ByteOrder
 }
 
-func NewClient[T any](conn *net.UDPConn, addr *net.UDPAddr, data *T, dispatcher *packet.Dispatcher, order binary.ByteOrder) *Client[T] {
+func NewClient[T any](conn *net.UDPConn, addr *net.UDPAddr, data *T, order binary.ByteOrder) *Client[T] {
 	return &Client[T]{
-		Data:       data,
-		conn:       conn,
-		addr:       addr,
-		dispatcher: dispatcher,
-		byteOrder:  order,
+		Data:      data,
+		conn:      conn,
+		addr:      addr,
+		byteOrder: order,
 	}
 }
 
-func Connect[T any](address string, data *T, dispatcher *packet.Dispatcher, order binary.ByteOrder) (*Client[T], error) {
+func Connect[T any](address string, data *T, order binary.ByteOrder) (*Client[T], error) {
 	addr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		return nil, err
@@ -36,39 +32,38 @@ func Connect[T any](address string, data *T, dispatcher *packet.Dispatcher, orde
 		return nil, err
 	}
 	return &Client[T]{
-		Data:       data,
-		conn:       conn,
-		addr:       addr,
-		dispatcher: dispatcher,
-		byteOrder:  order,
+		Data:      data,
+		conn:      conn,
+		addr:      addr,
+		byteOrder: order,
 	}, nil
 }
 
-func (c *Client[T]) ReadLoop(onPacket func(*Client[T], packet.Packet)) {
+func (c *Client[T]) ReadRaw() (*codec.ByteBuf, error) {
 	buf := make([]byte, 65535)
-	for {
-		n, err := c.conn.Read(buf)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		payloadBuf := codec.Wrap(buf[:n], c.byteOrder)
-		pkt, err := c.dispatcher.Decode(payloadBuf)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		pkt.OnFinishDecode()
-		onPacket(c, pkt)
+	n, err := c.conn.Read(buf)
+	if err != nil {
+		return nil, err
 	}
+
+	return codec.Wrap(buf[:n], c.byteOrder), nil
 }
 
-func (c *Client[T]) Send(pkt packet.Packet) error {
-	buf := codec.New(c.byteOrder)
-	buf.WriteUInt16(pkt.Id())
-	pkt.Encode(buf)
-	_, err := c.conn.Write(buf.ToBytesSlice())
+type Packet interface {
+	Id() uint16
+}
+
+type Encoder interface {
+	Encode(*codec.ByteBuf) error
+}
+
+func (c *Client[T]) Send(pkt Packet, enc Encoder) error {
+
+	var packetBuf *codec.ByteBuf = codec.New(c.byteOrder)
+	packetBuf.WriteUInt16(pkt.Id())
+	enc.Encode(packetBuf)
+	
+	_, err := c.conn.Write(packetBuf.ToBytesSlice())
 	return err
 }
 

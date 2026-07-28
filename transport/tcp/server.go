@@ -10,7 +10,7 @@ import (
 
 
 type ServerTcp[T any] struct{
-	validConnections []net.Conn
+	validConnections map[*Client[T]]struct{}
 	clientFactory func(conn net.Conn) *Client[T]
 	mu sync.Mutex
 }
@@ -44,5 +44,16 @@ func (self *ServerTcp[T]) Bind(ipInterface string, port int64){
 		var client *Client[T] = self.clientFactory(conn)
 		go client.ReadLoop()
 	}
-	
+}
+
+func (self *ServerTcp[T]) AddClient(client *Client[T]){
+	self.mu.Lock()
+	self.validConnections[client] = struct{}{}
+	self.mu.Unlock()
+}
+
+func (self *ServerTcp[T]) RemoveClient(client *Client[T]){
+	self.mu.Lock()
+	self.validConnections[client] = struct{}{}
+	self.mu.Unlock()
 }

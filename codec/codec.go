@@ -7,6 +7,3 @@ type Codec[T any] interface {
 type Decodec[T any] interface {
 	Decode(*ByteBuf) T
 }
-type PacketDecoder struct{
-	
-}

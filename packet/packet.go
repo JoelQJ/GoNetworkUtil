@@ -3,15 +3,11 @@ package packet
 import "GoNetworkUtils/codec"
 
 type Packet interface {
-	Id() uint32
+	Id() uint16
 	OnFinishDecode()
+	Encode(*codec.ByteBuf)
 }
 
-
-type PacketDecoder struct{
-	codec.Decodec[Packet]
-}
-
-type PacketEncoder struct{
-	codec.Codec[Packet]
+type Decoder interface {
+	Decode(*codec.ByteBuf) Packet
 }

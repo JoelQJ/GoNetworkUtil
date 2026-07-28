@@ -2,21 +2,27 @@ package packet
 
 import (
 	"GoNetworkUtils/codec"
+	"fmt"
 )
 
-
 type Dispatcher struct {
-    decodecs []PacketDecoder
+	decoders []Decoder
 }
 
-
-func (self *Dispatcher) Register(index uint16, decodec PacketDecoder){
-	self.decodecs[index] = decodec
+func NewDispatcher(count uint16) *Dispatcher {
+	return &Dispatcher{
+		decoders: make([]Decoder, count),
+	}
 }
 
-func (self *Dispatcher) Dispatch(buf *codec.ByteBuf) *Packet{
-	var id uint16 = buf.ReadUInt16();
-	var decoder PacketDecoder = self.decodecs[id]
-	var packet = decoder.Decode(buf)
-	return &packet
+func (d *Dispatcher) RegisterDecoder(id uint16, decoder Decoder) {
+	d.decoders[id] = decoder
+}
+
+func (d *Dispatcher) Decode(buf *codec.ByteBuf) (Packet, error) {
+	id := buf.ReadUInt16()
+	if int(id) >= len(d.decoders) || d.decoders[id] == nil {
+		return nil, fmt.Errorf("no decoder registered for packet id %d", id)
+	}
+	return d.decoders[id].Decode(buf), nil
 }

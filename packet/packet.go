@@ -8,7 +8,3 @@ type Packet interface {
 }
 
 type Decoder func(*codec.ByteBuf) Packet
-
-type Encoder interface {
-	Encode(*codec.ByteBuf) error
-}

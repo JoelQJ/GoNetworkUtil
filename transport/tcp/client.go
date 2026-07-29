@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"github.com/JoelQJ/GoNetworkUtil/codec"
+	"github.com/JoelQJ/GoNetworkUtil/packet"
 	"encoding/binary"
 	"io"
 	"net"
@@ -46,25 +47,22 @@ func (c *Client[T]) ReadRaw() (*codec.ByteBuf, error) {
 	return codec.Wrap(payload, c.byteOrder), nil
 }
 
-type Packet interface {
-	Id() uint16
+type PacketHandler[T any] interface {
+	OnFinishDecode(*Client[T])
 }
 
-type Encoder interface {
-	Encode(*codec.ByteBuf) error
-}
+func (c *Client[T]) Send(pkt packet.Packet) error {
+	body := codec.New(c.byteOrder)
+	body.WriteUInt16(pkt.Id())
+	pkt.Encode(body)
 
-func (c *Client[T]) Send(pkt Packet, enc Encoder) error {
-	var packetBuf *codec.ByteBuf = codec.New(c.byteOrder)
-	packetBuf.WriteUInt16(pkt.Id())
-	enc.Encode(packetBuf)
-	var payload []byte = packetBuf.ToBytesSlice()
-	
-	var frameBuf *codec.ByteBuf = codec.New(c.byteOrder)
-	frameBuf.WriteInt32(int32(len(payload)))
-	frameBuf.WriteBytes(payload)
-	
-	_, err := c.conn.Write(frameBuf.ToBytesSlice())
+	payload := body.ToBytesSlice()
+
+	frame := codec.New(c.byteOrder)
+	frame.WriteInt32(int32(len(payload)))
+	frame.WriteBytes(payload)
+
+	_, err := c.conn.Write(frame.ToBytesSlice())
 	return err
 }
 

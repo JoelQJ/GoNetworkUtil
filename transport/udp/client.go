@@ -2,6 +2,7 @@ package udp
 
 import (
 	"github.com/JoelQJ/GoNetworkUtil/codec"
+	"github.com/JoelQJ/GoNetworkUtil/packet"
 	"encoding/binary"
 	"net"
 )
@@ -49,21 +50,16 @@ func (c *Client[T]) ReadRaw() (*codec.ByteBuf, error) {
 	return codec.Wrap(buf[:n], c.byteOrder), nil
 }
 
-type Packet interface {
-	Id() uint16
+type PacketHandler[T any] interface {
+	OnFinishDecode(*Client[T])
 }
 
-type Encoder interface {
-	Encode(*codec.ByteBuf) error
-}
+func (c *Client[T]) Send(pkt packet.Packet) error {
+	body := codec.New(c.byteOrder)
+	body.WriteUInt16(pkt.Id())
+	pkt.Encode(body)
 
-func (c *Client[T]) Send(pkt Packet, enc Encoder) error {
-
-	var packetBuf *codec.ByteBuf = codec.New(c.byteOrder)
-	packetBuf.WriteUInt16(pkt.Id())
-	enc.Encode(packetBuf)
-	
-	_, err := c.conn.Write(packetBuf.ToBytesSlice())
+	_, err := c.conn.Write(body.ToBytesSlice())
 	return err
 }
 

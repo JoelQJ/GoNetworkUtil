@@ -4,10 +4,11 @@ import "github.com/JoelQJ/GoNetworkUtil/codec"
 
 type Packet interface {
 	Id() uint16
-	OnFinishDecode()
 	Encode(*codec.ByteBuf)
 }
 
-type Decoder interface {
-	Decode(*codec.ByteBuf) Packet
+type Decoder func(*codec.ByteBuf) Packet
+
+type Encoder interface {
+	Encode(*codec.ByteBuf) error
 }

@@ -4,21 +4,26 @@ import (
 	"github.com/JoelQJ/GoNetworkUtil/codec"
 	"github.com/JoelQJ/GoNetworkUtil/packet"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 )
 
+const DefaultMaxFrameSize = 10 * 1024 * 1024
+
 type Client[T any] struct {
-	Data      *T
-	conn      net.Conn
-	byteOrder binary.ByteOrder
+	Data         *T
+	conn         net.Conn
+	byteOrder    binary.ByteOrder
+	MaxFrameSize int
 }
 
 func NewClient[T any](conn net.Conn, data *T, order binary.ByteOrder) *Client[T] {
 	return &Client[T]{
-		Data:      data,
-		conn:      conn,
-		byteOrder: order,
+		Data:         data,
+		conn:         conn,
+		byteOrder:    order,
+		MaxFrameSize: DefaultMaxFrameSize,
 	}
 }
 
@@ -38,6 +43,10 @@ func (c *Client[T]) ReadRaw() (*codec.ByteBuf, error) {
 
 	buf := codec.Wrap(header, c.byteOrder)
 	size := buf.ReadInt32()
+
+	if size < 2 || size > int32(c.MaxFrameSize) {
+		return nil, errors.New("invalid frame size")
+	}
 
 	payload := make([]byte, size)
 	if _, err := io.ReadFull(c.conn, payload); err != nil {

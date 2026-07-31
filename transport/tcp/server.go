@@ -1,7 +1,6 @@
 package tcp
 
 import (
-	"github.com/JoelQJ/GoNetworkUtil/codec"
 	"errors"
 	"log"
 	"net"
@@ -10,14 +9,13 @@ import (
 
 type ServerTcp[T any] struct {
 	clientFactory func(conn net.Conn) *Client[T]
-	OnConnect     func(*Client[T])
-	OnRawPacket   func(*Client[T], *codec.ByteBuf)
-	OnDisconnect  func(*Client[T])
+	opts          *ConnectionOptions[T]
 }
 
-func NewServer[T any](clientFactory func(conn net.Conn) *Client[T]) *ServerTcp[T] {
+func NewServer[T any](clientFactory func(conn net.Conn) *Client[T], opts *ConnectionOptions[T]) *ServerTcp[T] {
 	return &ServerTcp[T]{
 		clientFactory: clientFactory,
+		opts:          opts,
 	}
 }
 
@@ -42,18 +40,20 @@ func (s *ServerTcp[T]) Bind(ipInterface string, port int64) {
 			continue
 		}
 		client := s.clientFactory(conn)
-		if s.OnConnect != nil {
-			s.OnConnect(client)
+		ApplyOptions(client, s.opts)
+		if s.opts != nil && s.opts.OnConnect != nil {
+			s.opts.OnConnect(client)
 		}
 		go s.handleClient(client)
 	}
 }
 
 func (s *ServerTcp[T]) handleClient(client *Client[T]) {
+	opts := s.opts
 	defer func() {
 		client.Close()
-		if s.OnDisconnect != nil {
-			s.OnDisconnect(client)
+		if opts != nil && opts.OnDisconnect != nil {
+			opts.OnDisconnect(client)
 		}
 	}()
 
@@ -63,8 +63,8 @@ func (s *ServerTcp[T]) handleClient(client *Client[T]) {
 			return
 		}
 
-		if s.OnRawPacket != nil {
-			s.OnRawPacket(client, buf)
+		if opts != nil && opts.OnRawPacket != nil {
+			opts.OnRawPacket(client, buf)
 		}
 	}
 }

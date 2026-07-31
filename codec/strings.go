@@ -8,6 +8,7 @@ func (self *ByteBuf) WriteStringUTF8(string string){
 
 func (self *ByteBuf) ReadStringUTF8() string{
 	length := self.ReadUInt32()
+	self.checkSize(int(length))
 	data := make([]byte, length)
 	self.ReadBytes(data)
 	return string(data)

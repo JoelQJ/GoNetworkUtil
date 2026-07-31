@@ -19,6 +19,19 @@ func (self *ByteBuf) ReadBytes(data []byte){
 	self.readIndex += len(data)
 }
 
+func (self *ByteBuf) WriteSliceBytes(data []byte){
+	self.WriteInt32(int32(len(data)))
+	self.WriteBytes(data)
+}
+
+func (self *ByteBuf) ReadSliceBytes() []byte{
+	size := self.ReadInt32()
+	self.checkSize(int(size))
+	data := make([]byte, size)
+	self.ReadBytes(data)
+	return data
+}
+
 func (self *ByteBuf) WriteUInt8(integer uint8){
 	self.ensureCapacity(SizeInt8)
 	self.buf[self.writeIndex] = integer

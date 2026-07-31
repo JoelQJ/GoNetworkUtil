@@ -9,12 +9,13 @@ import (
 type ServerUdp[T any] struct {
 	conn          *net.UDPConn
 	clientFactory func(addr *net.UDPAddr) *Client[T]
-	OnRawPacket   func(*Client[T], *codec.ByteBuf)
+	opts          *ConnectionOptions[T]
 }
 
-func NewServer[T any](clientFactory func(addr *net.UDPAddr) *Client[T]) *ServerUdp[T] {
+func NewServer[T any](clientFactory func(addr *net.UDPAddr) *Client[T], opts *ConnectionOptions[T]) *ServerUdp[T] {
 	return &ServerUdp[T]{
 		clientFactory: clientFactory,
+		opts:          opts,
 	}
 }
 
@@ -37,11 +38,15 @@ func (s *ServerUdp[T]) Bind(ipInterface string, port int64) {
 		}
 
 		client := s.clientFactory(remoteAddr)
+		ApplyOptions(client, s.opts)
+		if s.opts != nil && s.opts.OnConnect != nil {
+			s.opts.OnConnect(client)
+		}
 
 		payload := codec.Wrap(buf[:n], client.byteOrder)
 
-		if s.OnRawPacket != nil {
-			s.OnRawPacket(client, payload)
+		if s.opts != nil && s.opts.OnRawPacket != nil {
+			s.opts.OnRawPacket(client, payload)
 		}
 	}
 }

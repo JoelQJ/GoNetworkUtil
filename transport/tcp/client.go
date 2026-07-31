@@ -13,26 +13,92 @@ const DefaultMaxFrameSize = 10 * 1024 * 1024
 
 type Client[T any] struct {
 	Data         *T
+	opts         *ConnectionOptions[T]
 	conn         net.Conn
 	byteOrder    binary.ByteOrder
 	MaxFrameSize int
 }
 
-func NewClient[T any](conn net.Conn, data *T, order binary.ByteOrder) *Client[T] {
+type ConnectionOptions[T any] struct {
+	ByteOrder    binary.ByteOrder
+	MaxFrameSize int
+	Dispatcher   *packet.Dispatcher
+	OnConnect    func(*Client[T])
+	OnRawPacket  func(*Client[T], *codec.ByteBuf)
+	OnPacket     func(*Client[T], packet.Packet)
+	OnDisconnect func(*Client[T])
+}
+
+func NewClient[T any](conn net.Conn, data *T) *Client[T] {
 	return &Client[T]{
-		Data:         data,
-		conn:         conn,
-		byteOrder:    order,
-		MaxFrameSize: DefaultMaxFrameSize,
+		Data:  data,
+		conn:  conn,
 	}
 }
 
-func Connect[T any](address string, data *T, order binary.ByteOrder) (*Client[T], error) {
+func Connect[T any](address string, data *T, opts *ConnectionOptions[T]) (*Client[T], error) {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		return nil, err
 	}
-	return NewClient(conn, data, order), nil
+	client := NewClient(conn, data)
+	client.opts = opts
+	ApplyOptions(client, opts)
+	return client, nil
+}
+
+func ApplyOptions[T any](c *Client[T], opts *ConnectionOptions[T]) {
+	if opts == nil {
+		return
+	}
+	if opts.ByteOrder != nil {
+		c.byteOrder = opts.ByteOrder
+	} else {
+		c.byteOrder = binary.BigEndian
+	}
+	if opts.MaxFrameSize > 0 {
+		c.MaxFrameSize = opts.MaxFrameSize
+	} else {
+		c.MaxFrameSize = DefaultMaxFrameSize
+	}
+}
+
+func (c *Client[T]) ReadLoop() {
+	opts := c.opts
+	if opts != nil && opts.OnConnect != nil {
+		opts.OnConnect(c)
+	}
+	defer func() {
+		c.Close()
+		if opts != nil && opts.OnDisconnect != nil {
+			opts.OnDisconnect(c)
+		}
+	}()
+
+	for {
+		buf, err := c.ReadRaw()
+		if err != nil {
+			return
+		}
+
+		if opts != nil && opts.OnRawPacket != nil {
+			opts.OnRawPacket(c, buf)
+		}
+
+		if opts != nil && opts.Dispatcher != nil {
+			if buf.Len() < 2 {
+				c.Close()
+				return
+			}
+			packetId := buf.ReadUInt16()
+			if pkt, err := opts.Dispatcher.Decode(packetId, buf); err != nil {
+				c.Close()
+				return
+			} else if opts.OnPacket != nil {
+				opts.OnPacket(c, pkt)
+			}
+		}
+	}
 }
 
 func (c *Client[T]) ReadRaw() (*codec.ByteBuf, error) {
@@ -60,10 +126,10 @@ type PacketHandler[T any] interface {
 	OnFinishDecode(*Client[T])
 }
 
-func (c *Client[T]) Send(pkt packet.Packet) error {
+func (c *Client[T]) Send(encoder packet.Encoder) error {
 	body := codec.New(c.byteOrder)
-	body.WriteUInt16(pkt.Id())
-	pkt.Encode(body)
+	body.WriteUInt16(encoder.Id())
+	encoder.Encode(body)
 
 	payload := body.ToBytesSlice()
 

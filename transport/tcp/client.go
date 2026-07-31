@@ -1,18 +1,22 @@
 package tcp
 
 import (
-	"github.com/JoelQJ/GoNetworkUtil/codec"
-	"github.com/JoelQJ/GoNetworkUtil/packet"
 	"encoding/binary"
 	"errors"
 	"io"
+
 	"net"
+
+	"github.com/JoelQJ/GoNetworkUtil/codec"
+	"github.com/JoelQJ/GoNetworkUtil/packet"
 )
 
 const DefaultMaxFrameSize = 10 * 1024 * 1024
 
 type Client[T any] struct {
 	Data         *T
+	Alive        bool
+	CloseReason  string
 	opts         *ConnectionOptions[T]
 	conn         net.Conn
 	byteOrder    binary.ByteOrder
@@ -22,17 +26,15 @@ type Client[T any] struct {
 type ConnectionOptions[T any] struct {
 	ByteOrder    binary.ByteOrder
 	MaxFrameSize int
-	Dispatcher   *packet.Dispatcher
 	OnConnect    func(*Client[T])
 	OnRawPacket  func(*Client[T], *codec.ByteBuf)
-	OnPacket     func(*Client[T], packet.Packet)
 	OnDisconnect func(*Client[T])
 }
 
 func NewClient[T any](conn net.Conn, data *T) *Client[T] {
 	return &Client[T]{
-		Data:  data,
-		conn:  conn,
+		Data: data,
+		conn: conn,
 	}
 }
 
@@ -83,20 +85,6 @@ func (c *Client[T]) ReadLoop() {
 
 		if opts != nil && opts.OnRawPacket != nil {
 			opts.OnRawPacket(c, buf)
-		}
-
-		if opts != nil && opts.Dispatcher != nil {
-			if buf.Len() < 2 {
-				c.Close()
-				return
-			}
-			packetId := buf.ReadUInt16()
-			if pkt, err := opts.Dispatcher.Decode(packetId, buf); err != nil {
-				c.Close()
-				return
-			} else if opts.OnPacket != nil {
-				opts.OnPacket(c, pkt)
-			}
 		}
 	}
 }
@@ -158,5 +146,13 @@ func (c *Client[T]) LocalAddr() net.Addr {
 }
 
 func (c *Client[T]) Close() error {
+	return c.CloseWithReason("UNKNOWN")
+}
+
+func (c *Client[T]) CloseWithReason(reason string) error {
+	if c.CloseReason == "" {
+		c.CloseReason = reason
+	}
+	c.Alive = false
 	return c.conn.Close()
 }

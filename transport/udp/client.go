@@ -8,19 +8,18 @@ import (
 )
 
 type Client[T any] struct {
-	Data      *T
-	Alive     bool
-	conn      *net.UDPConn
-	addr      *net.UDPAddr
-	byteOrder binary.ByteOrder
+	Data        *T
+	Alive       bool
+	CloseReason string
+	conn        *net.UDPConn
+	addr        *net.UDPAddr
+	byteOrder   binary.ByteOrder
 }
 
 type ConnectionOptions[T any] struct {
 	ByteOrder   binary.ByteOrder
-	Dispatcher  *packet.Dispatcher
 	OnConnect   func(*Client[T])
 	OnRawPacket func(*Client[T], *codec.ByteBuf)
-	OnPacket    func(*Client[T], packet.Packet)
 }
 
 func NewClient[T any](conn *net.UDPConn, addr *net.UDPAddr, data *T) *Client[T] {
@@ -94,6 +93,13 @@ func (c *Client[T]) LocalAddr() net.Addr {
 }
 
 func (c *Client[T]) Close() error {
+	return c.CloseWithReason("UNKNOWN")
+}
+
+func (c *Client[T]) CloseWithReason(reason string) error {
+	if c.CloseReason == "" {
+		c.CloseReason = reason
+	}
 	c.Alive = false
 	return c.conn.Close()
 }

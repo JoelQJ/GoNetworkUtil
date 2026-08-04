@@ -42,6 +42,19 @@ func (self *ByteBuf) WriteInt8(integer int8){
 	self.WriteUInt8(uint8(integer))
 }
 
+func (self *ByteBuf) WriteBool(boolean bool){
+	if boolean{
+		self.WriteInt8(1)
+	}else{
+		self.WriteInt8(0)
+	}
+}
+
+func (self *ByteBuf) ReadBool() bool{
+	var byte int8 = self.ReadInt8()
+	return byte == 1
+}
+
 func (self *ByteBuf) ReadUInt8() uint8{
 	integer := self.buf[self.readIndex]
 	self.readIndex += SizeInt8

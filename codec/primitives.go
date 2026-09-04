@@ -2,141 +2,134 @@ package codec
 
 import "math"
 
-func (self *ByteBuf) WriteBytes(data []byte){
-	self.ensureCapacity(len(data))
-	copy(
-		self.buf[self.writeIndex:self.writeIndex+len(data)],
-		data,
-	)
-	self.writeIndex += len(data)
+func (b *ByteBuf) WriteBytes(data []byte) {
+	b.ensureCapacity(len(data))
+	copy(b.buf[b.writeIndex:b.writeIndex+len(data)], data)
+	b.writeIndex += len(data)
 }
 
-func (self *ByteBuf) ReadBytes(data []byte){
-	copy(
-		data,
-		self.buf[self.readIndex:self.readIndex+len(data)],
-	)
-	self.readIndex += len(data)
+func (b *ByteBuf) ReadBytes(data []byte) {
+	copy(data, b.buf[b.readIndex:b.readIndex+len(data)])
+	b.readIndex += len(data)
 }
 
-func (self *ByteBuf) WriteSliceBytes(data []byte){
-	self.WriteInt32(int32(len(data)))
-	self.WriteBytes(data)
+func (b *ByteBuf) WriteSliceBytes(data []byte) {
+	b.WriteInt32(int32(len(data)))
+	b.WriteBytes(data)
 }
 
-func (self *ByteBuf) ReadSliceBytes() []byte{
-	size := self.ReadInt32()
-	self.checkSize(int(size))
+func (b *ByteBuf) ReadSliceBytes() []byte {
+	size := b.ReadInt32()
+	b.checkSize(int(size))
 	data := make([]byte, size)
-	self.ReadBytes(data)
+	b.ReadBytes(data)
 	return data
 }
 
-func (self *ByteBuf) WriteUInt8(integer uint8){
-	self.ensureCapacity(SizeInt8)
-	self.buf[self.writeIndex] = integer
-	self.writeIndex += SizeInt8
+func (b *ByteBuf) WriteUInt8(v uint8) {
+	b.ensureCapacity(SizeUInt8)
+	b.buf[b.writeIndex] = v
+	b.writeIndex += SizeUInt8
 }
 
-func (self *ByteBuf) WriteInt8(integer int8){
-	self.WriteUInt8(uint8(integer))
+func (b *ByteBuf) WriteInt8(v int8) {
+	b.WriteUInt8(uint8(v))
 }
 
-func (self *ByteBuf) WriteBool(boolean bool){
-	if boolean{
-		self.WriteInt8(1)
-	}else{
-		self.WriteInt8(0)
+func (b *ByteBuf) WriteBool(v bool) {
+	if v {
+		b.WriteInt8(1)
+	} else {
+		b.WriteInt8(0)
 	}
 }
 
-func (self *ByteBuf) ReadBool() bool{
-	var byte int8 = self.ReadInt8()
-	return byte == 1
+func (b *ByteBuf) ReadBool() bool {
+	return b.ReadInt8() == 1
 }
 
-func (self *ByteBuf) ReadUInt8() uint8{
-	integer := self.buf[self.readIndex]
-	self.readIndex += SizeInt8
-	return integer
+func (b *ByteBuf) ReadUInt8() uint8 {
+	v := b.buf[b.readIndex]
+	b.readIndex += SizeUInt8
+	return v
 }
 
-func (self *ByteBuf) ReadInt8() int8{
-	return int8(self.ReadUInt8())
+func (b *ByteBuf) ReadInt8() int8 {
+	return int8(b.ReadUInt8())
 }
 
-func (self *ByteBuf) WriteUInt16(integer uint16){
-	self.ensureCapacity(SizeInt16)
-	self.order.PutUint16(self.buf[self.writeIndex:self.writeIndex+SizeInt16], integer)
-	self.writeIndex += SizeInt16
+func (b *ByteBuf) WriteUInt16(v uint16) {
+	b.ensureCapacity(SizeUInt16)
+	b.order.PutUint16(b.buf[b.writeIndex:b.writeIndex+SizeUInt16], v)
+	b.writeIndex += SizeUInt16
 }
 
-func (self *ByteBuf) WriteInt16(integer int16){
-	self.WriteUInt16(uint16(integer))
+func (b *ByteBuf) WriteInt16(v int16) {
+	b.WriteUInt16(uint16(v))
 }
 
-func (self *ByteBuf) ReadUInt16() uint16{
-	integer := self.order.Uint16(self.buf[self.readIndex:self.readIndex+SizeInt16])
-	self.readIndex += SizeInt16
-	return integer
+func (b *ByteBuf) ReadUInt16() uint16 {
+	v := b.order.Uint16(b.buf[b.readIndex : b.readIndex+SizeUInt16])
+	b.readIndex += SizeUInt16
+	return v
 }
 
-func (self *ByteBuf) ReadInt16() int16{
-	return int16(self.ReadUInt16())
+func (b *ByteBuf) ReadInt16() int16 {
+	return int16(b.ReadUInt16())
 }
 
-func (self *ByteBuf) WriteUInt32(integer uint32){
-	self.ensureCapacity(SizeInt32)
-	self.order.PutUint32(self.buf[self.writeIndex:self.writeIndex+SizeInt32], integer)
-	self.writeIndex += SizeInt32
+func (b *ByteBuf) WriteUInt32(v uint32) {
+	b.ensureCapacity(SizeUInt32)
+	b.order.PutUint32(b.buf[b.writeIndex:b.writeIndex+SizeUInt32], v)
+	b.writeIndex += SizeUInt32
 }
 
-func (self *ByteBuf) WriteInt32(integer int32){
-	self.WriteUInt32(uint32(integer))
+func (b *ByteBuf) WriteInt32(v int32) {
+	b.WriteUInt32(uint32(v))
 }
 
-func (self *ByteBuf) ReadUInt32() uint32{
-	integer := self.order.Uint32(self.buf[self.readIndex:self.readIndex+SizeInt32])
-	self.readIndex += SizeInt32
-	return integer
+func (b *ByteBuf) ReadUInt32() uint32 {
+	v := b.order.Uint32(b.buf[b.readIndex : b.readIndex+SizeUInt32])
+	b.readIndex += SizeUInt32
+	return v
 }
 
-func (self *ByteBuf) ReadInt32() int32{
-	return int32(self.ReadUInt32())
+func (b *ByteBuf) ReadInt32() int32 {
+	return int32(b.ReadUInt32())
 }
 
-func (self *ByteBuf) WriteUInt64(integer uint64){
-	self.ensureCapacity(SizeInt64)
-	self.order.PutUint64(self.buf[self.writeIndex:self.writeIndex+SizeInt64], integer)
-	self.writeIndex += SizeInt64
+func (b *ByteBuf) WriteUInt64(v uint64) {
+	b.ensureCapacity(SizeUInt64)
+	b.order.PutUint64(b.buf[b.writeIndex:b.writeIndex+SizeUInt64], v)
+	b.writeIndex += SizeUInt64
 }
 
-func (self *ByteBuf) WriteInt64(integer int64){
-	self.WriteUInt64(uint64(integer))
+func (b *ByteBuf) WriteInt64(v int64) {
+	b.WriteUInt64(uint64(v))
 }
 
-func (self *ByteBuf) ReadUInt64() uint64{
-	integer := self.order.Uint64(self.buf[self.readIndex:self.readIndex+SizeInt64])
-	self.readIndex += SizeInt64
-	return integer
+func (b *ByteBuf) ReadUInt64() uint64 {
+	v := b.order.Uint64(b.buf[b.readIndex : b.readIndex+SizeUInt64])
+	b.readIndex += SizeUInt64
+	return v
 }
 
-func (self *ByteBuf) ReadInt64() int64{
-	return int64(self.ReadUInt64())
+func (b *ByteBuf) ReadInt64() int64 {
+	return int64(b.ReadUInt64())
 }
 
-func (self *ByteBuf) WriteFloat32(float float32){
-	self.WriteUInt32(math.Float32bits(float))
+func (b *ByteBuf) WriteFloat32(v float32) {
+	b.WriteUInt32(math.Float32bits(v))
 }
 
-func (self *ByteBuf) ReadFloat32() float32{
-	return math.Float32frombits(self.ReadUInt32())
+func (b *ByteBuf) ReadFloat32() float32 {
+	return math.Float32frombits(b.ReadUInt32())
 }
 
-func (self *ByteBuf) WriteFloat64(double float64){
-	self.WriteUInt64(math.Float64bits(double))
+func (b *ByteBuf) WriteFloat64(v float64) {
+	b.WriteUInt64(math.Float64bits(v))
 }
 
-func (self *ByteBuf) ReadFloat64() float64{
-	return math.Float64frombits(self.ReadUInt64())
+func (b *ByteBuf) ReadFloat64() float64 {
+	return math.Float64frombits(b.ReadUInt64())
 }

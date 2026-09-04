@@ -10,14 +10,6 @@ import (
 	"os"
 )
 
-type PrivateKey struct {
-	key ed25519.PrivateKey
-}
-
-type PublicKey struct {
-	key ed25519.PublicKey
-}
-
 func Generate() (*PrivateKey, *PublicKey, error) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -38,34 +30,6 @@ func NewPublicKey(raw []byte) (*PublicKey, error) {
 		return nil, errors.New("invalid public key size")
 	}
 	return &PublicKey{key: ed25519.PublicKey(raw)}, nil
-}
-
-func (k *PrivateKey) Bytes() []byte {
-	return k.key
-}
-
-func (k *PrivateKey) Hex() string {
-	return hex.EncodeToString(k.key)
-}
-
-func (k *PrivateKey) Public() *PublicKey {
-	return &PublicKey{key: k.key.Public().(ed25519.PublicKey)}
-}
-
-func (k *PrivateKey) Sign(data []byte) []byte {
-	return ed25519.Sign(k.key, data)
-}
-
-func (k *PrivateKey) SaveToFile(path string) error {
-	der, err := x509.MarshalPKCS8PrivateKey(k.key)
-	if err != nil {
-		return err
-	}
-	block := &pem.Block{
-		Type:  "PRIVATE KEY",
-		Bytes: der,
-	}
-	return os.WriteFile(path, pem.EncodeToMemory(block), 0600)
 }
 
 func LoadPrivateKey(pemData []byte) (*PrivateKey, error) {
@@ -97,28 +61,32 @@ func LoadPrivateKeyFromFile(path string) (*PrivateKey, error) {
 	return LoadPrivateKey(raw)
 }
 
-func (k *PublicKey) Bytes() []byte {
+func (k *PrivateKey) Bytes() []byte {
 	return k.key
 }
 
-func (k *PublicKey) Hex() string {
+func (k *PrivateKey) Hex() string {
 	return hex.EncodeToString(k.key)
 }
 
-func (k *PublicKey) Verify(data, signature []byte) bool {
-	return ed25519.Verify(k.key, data, signature)
+func (k *PrivateKey) Public() *PublicKey {
+	return &PublicKey{key: k.key.Public().(ed25519.PublicKey)}
 }
 
-func (k *PublicKey) SaveToFile(path string) error {
-	der, err := x509.MarshalPKIXPublicKey(k.key)
+func (k *PrivateKey) Sign(data []byte) []byte {
+	return ed25519.Sign(k.key, data)
+}
+
+func (k *PrivateKey) SaveToFile(path string) error {
+	der, err := x509.MarshalPKCS8PrivateKey(k.key)
 	if err != nil {
 		return err
 	}
 	block := &pem.Block{
-		Type:  "PUBLIC KEY",
+		Type:  "PRIVATE KEY",
 		Bytes: der,
 	}
-	return os.WriteFile(path, pem.EncodeToMemory(block), 0644)
+	return os.WriteFile(path, pem.EncodeToMemory(block), 0600)
 }
 
 func LoadPublicKey(pemData []byte) (*PublicKey, error) {
@@ -148,4 +116,28 @@ func LoadPublicKeyFromFile(path string) (*PublicKey, error) {
 		return nil, err
 	}
 	return LoadPublicKey(raw)
+}
+
+func (k *PublicKey) Bytes() []byte {
+	return k.key
+}
+
+func (k *PublicKey) Hex() string {
+	return hex.EncodeToString(k.key)
+}
+
+func (k *PublicKey) Verify(data, signature []byte) bool {
+	return ed25519.Verify(k.key, data, signature)
+}
+
+func (k *PublicKey) SaveToFile(path string) error {
+	der, err := x509.MarshalPKIXPublicKey(k.key)
+	if err != nil {
+		return err
+	}
+	block := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: der,
+	}
+	return os.WriteFile(path, pem.EncodeToMemory(block), 0644)
 }

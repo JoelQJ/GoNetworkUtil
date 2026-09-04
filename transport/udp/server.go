@@ -1,33 +1,28 @@
 package udp
 
 import (
-	"github.com/JoelQJ/GoNetworkUtil/codec"
 	"log"
 	"net"
+
+	"github.com/JoelQJ/GoNetworkUtil/codec"
 )
 
-type ServerUdp[T any] struct {
-	conn          *net.UDPConn
-	clientFactory func(addr *net.UDPAddr) *Client[T]
-	opts          *ConnectionOptions[T]
+func NewServer[T any](factory func(*net.UDPAddr) *Client[T], opts *ConnectionOptions[T]) *Server[T] {
+	return &Server[T]{factory: factory, opts: opts}
 }
 
-func NewServer[T any](clientFactory func(addr *net.UDPAddr) *Client[T], opts *ConnectionOptions[T]) *ServerUdp[T] {
-	return &ServerUdp[T]{
-		clientFactory: clientFactory,
-		opts:          opts,
+func (s *Server[T]) Bind(address string) error {
+	addr, err := net.ResolveUDPAddr("udp", address)
+	if err != nil {
+		return err
 	}
-}
-
-func (s *ServerUdp[T]) Bind(ipInterface string, port int64) {
-	addr := &net.UDPAddr{IP: net.ParseIP(ipInterface), Port: int(port)}
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 	s.conn = conn
-	log.Println("Server UDP Listening on:", addr.String())
+	defer conn.Close()
+	log.Println("UDP listening on:", addr)
 
 	buf := make([]byte, 65535)
 	for {
@@ -37,14 +32,12 @@ func (s *ServerUdp[T]) Bind(ipInterface string, port int64) {
 			continue
 		}
 
-		client := s.clientFactory(remoteAddr)
-		ApplyOptions(client, s.opts)
+		client := s.factory(remoteAddr)
 		if s.opts != nil && s.opts.OnConnect != nil {
 			s.opts.OnConnect(client)
 		}
 
-		payload := codec.Wrap(buf[:n], client.byteOrder)
-
+		payload := codec.Wrap(buf[:n], client.order)
 		if s.opts != nil && s.opts.OnRawPacket != nil {
 			s.opts.OnRawPacket(client, payload)
 		}

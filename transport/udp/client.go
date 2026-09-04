@@ -1,33 +1,30 @@
 package udp
 
 import (
-	"github.com/JoelQJ/GoNetworkUtil/codec"
-	"github.com/JoelQJ/GoNetworkUtil/packet"
 	"encoding/binary"
 	"net"
+
+	"github.com/JoelQJ/GoNetworkUtil/codec"
+	"github.com/JoelQJ/GoNetworkUtil/packet"
 )
 
-type Client[T any] struct {
-	Data        *T
-	Alive       bool
-	CloseReason string
-	conn        *net.UDPConn
-	addr        *net.UDPAddr
-	byteOrder   binary.ByteOrder
-}
-
-type ConnectionOptions[T any] struct {
-	ByteOrder   binary.ByteOrder
-	OnConnect   func(*Client[T])
-	OnRawPacket func(*Client[T], *codec.ByteBuf)
-}
-
-func NewClient[T any](conn *net.UDPConn, addr *net.UDPAddr, data *T) *Client[T] {
+func NewClient[T any](conn *net.UDPConn, addr *net.UDPAddr, data *T, opts *ConnectionOptions[T]) *Client[T] {
+	if data == nil {
+		data = new(T)
+	}
+	if opts == nil {
+		opts = &ConnectionOptions[T]{}
+	}
+	order := opts.ByteOrder
+	if order == nil {
+		order = binary.BigEndian
+	}
 	return &Client[T]{
 		Data:  data,
-		Alive: true,
 		conn:  conn,
 		addr:  addr,
+		order: order,
+		opts:  opts,
 	}
 }
 
@@ -40,47 +37,28 @@ func Connect[T any](address string, data *T, opts *ConnectionOptions[T]) (*Clien
 	if err != nil {
 		return nil, err
 	}
-	client := NewClient(conn, addr, data)
-	ApplyOptions(client, opts)
-	return client, nil
+	return NewClient(conn, addr, data, opts), nil
 }
 
-func ApplyOptions[T any](c *Client[T], opts *ConnectionOptions[T]) {
-	if opts == nil {
-		return
-	}
-	if opts.ByteOrder != nil {
-		c.byteOrder = opts.ByteOrder
-	} else {
-		c.byteOrder = binary.BigEndian
-	}
-}
-
-func (c *Client[T]) ReadRaw() (*codec.ByteBuf, error) {
+func (c *Client[T]) ReadPacket() (*codec.ByteBuf, error) {
 	buf := make([]byte, 65535)
 	n, err := c.conn.Read(buf)
 	if err != nil {
 		return nil, err
 	}
-
-	return codec.Wrap(buf[:n], c.byteOrder), nil
-}
-
-type PacketHandler[T any] interface {
-	OnFinishDecode(*Client[T])
+	return codec.Wrap(buf[:n], c.order), nil
 }
 
 func (c *Client[T]) Send(encoder packet.Encoder) error {
-	body := codec.New(c.byteOrder)
-	body.WriteUInt16(encoder.Id())
+	body := codec.New(c.order)
+	body.WriteUInt16(encoder.ID())
 	encoder.Encode(body)
 
-	_, err := c.conn.Write(body.ToBytesSlice())
-	return err
+	return c.SendRaw(body.Bytes())
 }
 
 func (c *Client[T]) SendRaw(data []byte) error {
-	_, err := c.conn.Write(data)
+	_, err := c.conn.WriteToUDP(data, c.addr)
 	return err
 }
 
@@ -93,13 +71,12 @@ func (c *Client[T]) LocalAddr() net.Addr {
 }
 
 func (c *Client[T]) Close() error {
-	return c.CloseWithReason("UNKNOWN")
+	c.once.Do(func() {
+		c.closeErr = c.conn.Close()
+	})
+	return c.closeErr
 }
 
-func (c *Client[T]) CloseWithReason(reason string) error {
-	if c.CloseReason == "" {
-		c.CloseReason = reason
-	}
-	c.Alive = false
-	return c.conn.Close()
+func (c *Client[T]) Err() error {
+	return c.closeErr
 }

@@ -4,37 +4,33 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-
 	"net"
 
 	"github.com/JoelQJ/GoNetworkUtil/codec"
 	"github.com/JoelQJ/GoNetworkUtil/packet"
 )
 
-const DefaultMaxFrameSize = 10 * 1024 * 1024
-
-type Client[T any] struct {
-	Data         *T
-	Alive        bool
-	CloseReason  string
-	opts         *ConnectionOptions[T]
-	conn         net.Conn
-	byteOrder    binary.ByteOrder
-	MaxFrameSize int
-}
-
-type ConnectionOptions[T any] struct {
-	ByteOrder    binary.ByteOrder
-	MaxFrameSize int
-	OnConnect    func(*Client[T])
-	OnRawPacket  func(*Client[T], *codec.ByteBuf)
-	OnDisconnect func(*Client[T])
-}
-
-func NewClient[T any](conn net.Conn, data *T) *Client[T] {
+func NewClient[T any](conn net.Conn, data *T, opts *ConnectionOptions[T]) *Client[T] {
+	if data == nil {
+		data = new(T)
+	}
+	if opts == nil {
+		opts = &ConnectionOptions[T]{}
+	}
+	order := opts.ByteOrder
+	if order == nil {
+		order = binary.BigEndian
+	}
+	maxFrame := opts.MaxFrameSize
+	if maxFrame <= 0 {
+		maxFrame = DefaultMaxFrameSize
+	}
 	return &Client[T]{
-		Data: data,
-		conn: conn,
+		Data:     data,
+		conn:     conn,
+		order:    order,
+		maxFrame: maxFrame,
+		opts:     opts,
 	}
 }
 
@@ -43,62 +39,39 @@ func Connect[T any](address string, data *T, opts *ConnectionOptions[T]) (*Clien
 	if err != nil {
 		return nil, err
 	}
-	client := NewClient(conn, data)
-	client.opts = opts
-	ApplyOptions(client, opts)
-	return client, nil
-}
-
-func ApplyOptions[T any](c *Client[T], opts *ConnectionOptions[T]) {
-	if opts == nil {
-		return
-	}
-	if opts.ByteOrder != nil {
-		c.byteOrder = opts.ByteOrder
-	} else {
-		c.byteOrder = binary.BigEndian
-	}
-	if opts.MaxFrameSize > 0 {
-		c.MaxFrameSize = opts.MaxFrameSize
-	} else {
-		c.MaxFrameSize = DefaultMaxFrameSize
-	}
+	return NewClient(conn, data, opts), nil
 }
 
 func (c *Client[T]) ReadLoop() {
-	opts := c.opts
-	if opts != nil && opts.OnConnect != nil {
-		opts.OnConnect(c)
+	if c.opts.OnConnect != nil {
+		c.opts.OnConnect(c)
 	}
 	defer func() {
 		c.Close()
-		if opts != nil && opts.OnDisconnect != nil {
-			opts.OnDisconnect(c)
+		if c.opts.OnDisconnect != nil {
+			c.opts.OnDisconnect(c)
 		}
 	}()
 
 	for {
-		buf, err := c.ReadRaw()
+		buf, err := c.ReadPacket()
 		if err != nil {
 			return
 		}
-
-		if opts != nil && opts.OnRawPacket != nil {
-			opts.OnRawPacket(c, buf)
+		if c.opts.OnRawPacket != nil {
+			c.opts.OnRawPacket(c, buf)
 		}
 	}
 }
 
-func (c *Client[T]) ReadRaw() (*codec.ByteBuf, error) {
+func (c *Client[T]) ReadPacket() (*codec.ByteBuf, error) {
 	header := make([]byte, 4)
 	if _, err := io.ReadFull(c.conn, header); err != nil {
 		return nil, err
 	}
 
-	buf := codec.Wrap(header, c.byteOrder)
-	size := buf.ReadInt32()
-
-	if size < 2 || size > int32(c.MaxFrameSize) {
+	size := int32(codec.Wrap(header, c.order).ReadInt32())
+	if size < 2 || int(size) > c.maxFrame {
 		return nil, errors.New("invalid frame size")
 	}
 
@@ -106,34 +79,22 @@ func (c *Client[T]) ReadRaw() (*codec.ByteBuf, error) {
 	if _, err := io.ReadFull(c.conn, payload); err != nil {
 		return nil, err
 	}
-
-	return codec.Wrap(payload, c.byteOrder), nil
-}
-
-type PacketHandler[T any] interface {
-	OnFinishDecode(*Client[T])
+	return codec.Wrap(payload, c.order), nil
 }
 
 func (c *Client[T]) Send(encoder packet.Encoder) error {
-	body := codec.New(c.byteOrder)
-	body.WriteUInt16(encoder.Id())
+	body := codec.New(c.order)
+	body.WriteUInt16(encoder.ID())
 	encoder.Encode(body)
 
-	payload := body.ToBytesSlice()
-
-	frame := codec.New(c.byteOrder)
-	frame.WriteInt32(int32(len(payload)))
-	frame.WriteBytes(payload)
-
-	_, err := c.conn.Write(frame.ToBytesSlice())
-	return err
+	return c.SendRaw(body.Bytes())
 }
 
 func (c *Client[T]) SendRaw(data []byte) error {
-	frame := codec.New(c.byteOrder)
+	frame := codec.New(c.order)
 	frame.WriteInt32(int32(len(data)))
 	frame.WriteBytes(data)
-	_, err := c.conn.Write(frame.ToBytesSlice())
+	_, err := c.conn.Write(frame.Bytes())
 	return err
 }
 
@@ -146,13 +107,12 @@ func (c *Client[T]) LocalAddr() net.Addr {
 }
 
 func (c *Client[T]) Close() error {
-	return c.CloseWithReason("UNKNOWN")
+	c.once.Do(func() {
+		c.closeErr = c.conn.Close()
+	})
+	return c.closeErr
 }
 
-func (c *Client[T]) CloseWithReason(reason string) error {
-	if c.CloseReason == "" {
-		c.CloseReason = reason
-	}
-	c.Alive = false
-	return c.conn.Close()
+func (c *Client[T]) Err() error {
+	return c.closeErr
 }

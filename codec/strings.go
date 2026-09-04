@@ -1,15 +1,15 @@
 package codec
 
-func (self *ByteBuf) WriteStringUTF8(string string){
-	data := []byte(string)
-	self.WriteUInt32(uint32(len(data)))
-	self.WriteBytes(data)
+func (b *ByteBuf) WriteStringUTF8(s string) {
+	data := []byte(s)
+	b.WriteUInt32(uint32(len(data)))
+	b.WriteBytes(data)
 }
 
-func (self *ByteBuf) ReadStringUTF8() string{
-	length := self.ReadUInt32()
-	self.checkSize(int(length))
+func (b *ByteBuf) ReadStringUTF8() string {
+	length := b.ReadUInt32()
+	b.checkSize(int(length))
 	data := make([]byte, length)
-	self.ReadBytes(data)
+	b.ReadBytes(data)
 	return string(data)
 }

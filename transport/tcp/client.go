@@ -87,10 +87,10 @@ func (c *Client[T]) Send(encoder packet.Encoder) error {
 	body.WriteUInt16(encoder.ID())
 	encoder.Encode(body)
 
-	return c.SendRaw(body.Bytes())
+	return c.sendRaw(body.Bytes())
 }
 
-func (c *Client[T]) SendRaw(data []byte) error {
+func (c *Client[T]) sendRaw(data []byte) error {
 	frame := codec.New(c.order)
 	frame.WriteInt32(int32(len(data)))
 	frame.WriteBytes(data)
@@ -107,12 +107,21 @@ func (c *Client[T]) LocalAddr() net.Addr {
 }
 
 func (c *Client[T]) Close() error {
-	c.once.Do(func() {
-		c.closeErr = c.conn.Close()
-	})
+	c.CloseWithError(nil)
 	return c.closeErr
 }
 
 func (c *Client[T]) Err() error {
 	return c.closeErr
+}
+
+func (c *Client[T]) CloseWithError(err error) {
+	c.once.Do(func(){
+		c.conn.Close()
+		if c.closeErr == nil {
+			c.closeErr = err
+		}
+	})
+	
+
 }

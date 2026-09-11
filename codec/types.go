@@ -17,3 +17,7 @@ type Encoder[T any] interface {
 type Decoder[T any] interface {
 	Decode(*ByteBuf) T
 }
+
+type SelfEncoder interface {
+	Encode(*ByteBuf)
+}

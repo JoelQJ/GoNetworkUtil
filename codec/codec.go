@@ -39,6 +39,47 @@ func Decode[T any](b *ByteBuf, dec Decoder[T]) T {
 	return dec.Decode(b)
 }
 
+func EncodeSlice[T any](b *ByteBuf, enc Encoder[T], values []T) {
+	b.WriteInt32(int32(len(values)))
+	for _, v := range values {
+		enc.Encode(b, v)
+	}
+}
+
+func EncodeSliceFunc[T any](b *ByteBuf, values []T, encode func(*ByteBuf, T)) {
+	b.WriteInt32(int32(len(values)))
+	for _, v := range values {
+		encode(b, v)
+	}
+}
+
+func DecodeSlice[T any](b *ByteBuf, dec Decoder[T]) []T {
+	size := b.ReadInt32()
+	b.checkSize(int(size))
+	values := make([]T, size)
+	for i := range values {
+		values[i] = dec.Decode(b)
+	}
+	return values
+}
+
+func DecodeSliceFunc[T any](b *ByteBuf, decode func(*ByteBuf) T) []T {
+	size := b.ReadInt32()
+	b.checkSize(int(size))
+	values := make([]T, size)
+	for i := range values {
+		values[i] = decode(b)
+	}
+	return values
+}
+
+func EncodeSelfSlice[T SelfEncoder](b *ByteBuf, values []T) {
+	b.WriteInt32(int32(len(values)))
+	for _, v := range values {
+		v.Encode(b)
+	}
+}
+
 func (b *ByteBuf) checkSize(size int) {
 	if b.maxSize > 0 && size > b.maxSize {
 		panic("size exceeds max")

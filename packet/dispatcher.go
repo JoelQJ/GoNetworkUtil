@@ -2,6 +2,7 @@ package packet
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/JoelQJ/GoNetworkUtil/codec"
 )
@@ -19,6 +20,10 @@ func NewDispatcher[T any](count uint16) *Dispatcher[T] {
 }
 
 func (d *Dispatcher[T]) RegisterDecoder(id uint16, decoder Decoder) {
+	if d.decoders[id] != nil{
+		log.Fatal("Decoder con Id: ", id, " duplicado")
+		return
+	}
 	d.decoders[id] = decoder
 }
 

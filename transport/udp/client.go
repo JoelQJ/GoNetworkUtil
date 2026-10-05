@@ -5,7 +5,6 @@ import (
 	"net"
 
 	"github.com/JoelQJ/GoNetworkUtil/codec"
-	"github.com/JoelQJ/GoNetworkUtil/packet"
 )
 
 func NewClient[T any](conn *net.UDPConn, addr *net.UDPAddr, data *T, opts *ConnectionOptions[T]) *Client[T] {
@@ -49,16 +48,12 @@ func (c *Client[T]) ReadPacket() (*codec.ByteBuf, error) {
 	return codec.Wrap(buf[:n], c.order), nil
 }
 
-func (c *Client[T]) Send(encoder packet.Encoder) error {
+func (c *Client[T]) Send(id uint16, buf *codec.ByteBuf) error {
 	body := codec.New(c.order)
-	body.WriteUInt16(encoder.ID())
-	encoder.Encode(body)
+	body.WriteUInt16(id)
+	body.WriteBytes(buf.Bytes())
 
-	return c.SendRaw(body.Bytes())
-}
-
-func (c *Client[T]) SendRaw(data []byte) error {
-	_, err := c.conn.WriteToUDP(data, c.addr)
+	_, err := c.conn.WriteToUDP(body.Bytes(), c.addr)
 	return err
 }
 

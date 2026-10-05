@@ -38,8 +38,10 @@ func (s *Server[T]) Bind(address string) error {
 		}
 
 		payload := codec.Wrap(buf[:n], client.order)
-		if s.opts != nil && s.opts.OnRawPacket != nil {
-			s.opts.OnRawPacket(client, payload)
+		if s.opts != nil && s.opts.Dispatcher != nil {
+			if err := s.opts.Dispatcher.Dispatch(client, payload); err != nil {
+				log.Println(err)
+			}
 		}
 	}
 }

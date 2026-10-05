@@ -63,6 +63,20 @@ func DecodeSlice[T any](b *ByteBuf, dec Decoder[T]) []T {
 	return values
 }
 
+func WriteSlice[T any](b *ByteBuf, values []T, encode func(*ByteBuf, T)) {
+	b.WriteInt32(int32(len(values)))
+	for _, v := range values {
+		encode(b, v)
+	}
+}
+
+func WriteSlicePtr[T any](b *ByteBuf, values []T, encode func(*ByteBuf, *T)) {
+	b.WriteInt32(int32(len(values)))
+	for i := range values {
+		encode(b, &values[i])
+	}
+}
+
 func DecodeSliceFunc[T any](b *ByteBuf, decode func(*ByteBuf) T) []T {
 	size := b.ReadInt32()
 	b.checkSize(int(size))

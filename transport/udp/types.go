@@ -5,7 +5,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/JoelQJ/GoNetworkUtil/codec"
+	"github.com/JoelQJ/GoNetworkUtil/packet"
 )
 
 type Client[T any] struct {
@@ -29,6 +29,7 @@ type Server[T any] struct {
 type ConnectionOptions[T any] struct {
 	ByteOrder binary.ByteOrder
 
-	OnConnect   func(*Client[T])
-	OnRawPacket func(*Client[T], *codec.ByteBuf)
+	OnConnect func(*Client[T])
+
+	Dispatcher *packet.Dispatcher[*Client[T]]
 }

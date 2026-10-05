@@ -5,7 +5,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/JoelQJ/GoNetworkUtil/codec"
+	"github.com/JoelQJ/GoNetworkUtil/packet"
 )
 
 const DefaultMaxFrameSize = 10 * 1024 * 1024
@@ -31,6 +31,7 @@ type ConnectionOptions[T any] struct {
 	MaxFrameSize int
 
 	OnConnect    func(*Client[T])
-	OnRawPacket  func(*Client[T], *codec.ByteBuf)
 	OnDisconnect func(*Client[T])
+
+	Dispatcher *packet.Dispatcher[*Client[T]]
 }

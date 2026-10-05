@@ -2,13 +2,6 @@ package packet
 
 import "github.com/JoelQJ/GoNetworkUtil/codec"
 
-type Packet any
-
-type Encoder interface {
-	ID() uint16
-	Encode(*codec.ByteBuf)
-}
-
-type Decoder func(*codec.ByteBuf) Packet
-
-type Handler[T any] func(T, Packet)
+// Handler receives the connection the packet came from and the buffer already
+// positioned right after the packet id.
+type Handler[T any] func(T, *codec.ByteBuf)

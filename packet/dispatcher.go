@@ -2,51 +2,33 @@ package packet
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/JoelQJ/GoNetworkUtil/codec"
 )
 
 type Dispatcher[T any] struct {
-	decoders []Decoder
-	handlers []Handler[T]
+	handlers map[uint16]Handler[T]
 }
 
-func NewDispatcher[T any](count uint16) *Dispatcher[T] {
-	return &Dispatcher[T]{
-		decoders: make([]Decoder, count),
-		handlers: make([]Handler[T], count),
-	}
+func NewDispatcher[T any]() *Dispatcher[T] {
+	return &Dispatcher[T]{handlers: make(map[uint16]Handler[T])}
 }
 
-func (d *Dispatcher[T]) RegisterDecoder(id uint16, decoder Decoder) {
-	if d.decoders[id] != nil{
-		log.Fatal("Decoder con Id: ", id, " duplicado")
-		return
+func (d *Dispatcher[T]) Register(id uint16, handler Handler[T]) {
+	if _, ok := d.handlers[id]; ok {
+		panic(fmt.Sprintf("packet: handler with id %d already registered", id))
 	}
-	d.decoders[id] = decoder
+	d.handlers[id] = handler
 }
 
-func RegisterHandler[T any, P any](d *Dispatcher[T], id uint16, handler func(T, P)) {
-	d.handlers[id] = func(client T, pkt Packet) {
-		handler(client, pkt.(P))
-	}
-}
+func (d *Dispatcher[T]) Dispatch(client T, buf *codec.ByteBuf) error {
+	id := buf.ReadUInt16()
 
-func (d *Dispatcher[T]) Decode(id uint16, buf *codec.ByteBuf) (Packet, error) {
-	if int(id) >= len(d.decoders) || d.decoders[id] == nil {
-		return nil, fmt.Errorf("no decoder registered for packet id %d", id)
+	handler, ok := d.handlers[id]
+	if !ok {
+		return fmt.Errorf("packet: no handler registered for id %d", id)
 	}
-	return d.decoders[id](buf), nil
-}
 
-func (d *Dispatcher[T]) Dispatch(client T, id uint16, buf *codec.ByteBuf) error {
-	pkt, err := d.Decode(id, buf)
-	if err != nil {
-		return err
-	}
-	if int(id) < len(d.handlers) && d.handlers[id] != nil {
-		d.handlers[id](client, pkt)
-	}
+	handler(client, buf)
 	return nil
 }
